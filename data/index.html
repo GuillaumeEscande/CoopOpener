@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+	<head>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<title>Welcome on CoopOpener</title>
+		<link rel="shortcut icon" href="favicon.ico">
+		<link rel="stylesheet" type="text/css" href="main.css" media="screen">
+
+	</head>
+
+	<body>
+
+		<header>
+			<h1>
+				Welcome on CoopOpener
+			</h1>
+			<p>Time :  %TIME% </p>
+		</header>
+
+		<div>
+			<article>
+					<h1>Etat de la porte : %DOOR_STATE%</h1>
+			</article>
+
+			<article>
+				<h2>Manual Door Managment</h2>
+				<section>
+					<form>
+						<h2>Manual Open</h2>
+						<input id="open" name="open" type="hidden" value="Open">
+						<button>Open</button>
+					</form>
+				</section>
+				<section>
+					<form>
+						<h2>Manual Close</h2>
+						<input id="close" name="close" type="hidden" value="Close">
+						<button>Close</button>
+					</form>
+				</section>
+			</article>
+
+			<article>
+				<h1>Distribution Parameters</h1>
+				<section>
+					<h2>Cron open</h2>
+					<form>
+						<input type="text" id="cron_open" name="cron_open" required value="%CRON_OPEN%"/>
+						<button>Update</button>
+					</form>
+				</section>
+				<section>
+					<h2>Cron close</h2>
+					<form>
+						<input type="text" id="cron_close" name="cron_close" required value="%CRON_CLOSE%"/>
+						<button>Update</button>
+					</form>
+				</section>
+			</article>
+		</div>
+
+		<footer>
+			Software hosted here : <a href="https://github.com/GuillaumeEscande/CoopOpener">on Github</a>
+		</footer>
+
+	</body>
+
+</html>
+
