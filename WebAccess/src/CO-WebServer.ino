@@ -13,19 +13,16 @@
 #include <sys/time.h>
 #include <CronAlarms.h>
 #include <sntp.h>
+#include "protocol.hpp"
 
-#define STASSID "***"
-#define STAPSK  "***"
+#define DEBUG 0
 
-#define SWITCH_OPEN_PIN 13
-#define SWITCH_CLOSE_PIN 12
-#define MOTOR_1_PIN 2
-#define MOTOR_2_PIN 15
+#define STASSID "GuiEtJew"
+#define STAPSK  "lithium est notre chat."
 
-
-#define INIT_VALUE 56
-#define DEFAULT_CRON_OPEN "0 0 6 * * *"
-#define DEFAULT_CRON_CLOSE "0 0 20 * * *"
+#define INIT_VALUE 10
+#define DEFAULT_CRON_OPEN "0 0 5 * * *"
+#define DEFAULT_CRON_CLOSE "0 0 22 * * *"
 
 
 #define ADDR_INIT 0
@@ -66,24 +63,27 @@ void writeStringToEEPROM(int addrOffset, const String &strToWrite)
     EEPROM.write(addrOffset + 1 + i, strToWrite[i]);
   }
 }
-
-bool door_is_open(){
-  return ! digitalRead(SWITCH_OPEN_PIN);
-}
-
-bool door_is_close(){
-  return ! digitalRead(SWITCH_CLOSE_PIN);
-}
-
 String processor(const String& var){
   if(var == "TIME"){
     time_t now = time(nullptr);
     return ctime(&now);
   } else if(var == "DOOR_STATE"){
-    if (door_is_open())
+
+    Serial.println(QUERY_STATE);
+    String result = "";
+    while(result=""){
+      if (Serial.available()){
+        result = Serial.readString();
+        delay(10);
+      }
+    }
+    //String result=RESPONSE_IS_OPEN;
+    if(result.equals(RESPONSE_IS_OPEN)){
       return "OPEN";
-    if (door_is_close())
+    }
+    if(result.equals(RESPONSE_IS_CLOSE)){
       return "CLOSE";
+    }
     return "UNKNOWN";    
   } else if(var == "CRON_OPEN"){
     return readStringFromEEPROM(ADDR_CRON_OPEN);
@@ -95,52 +95,29 @@ String processor(const String& var){
 }
 
 void updateCron(CronId id, int addrOffset, OnTick_t onTickHandler){
-  Serial.println("RUN - updateCron");
+  if (DEBUG)
+    Serial.println("RUN - updateCron");
   Cron.free(id);
   String cronExpression = readStringFromEEPROM(addrOffset);
   Serial.println(cronExpression);
   id = Cron.create(cronExpression.c_str(), onTickHandler, false);
-  Serial.println("RUN - updateCron - OK");
+  if (DEBUG)
+    Serial.println("RUN - updateCron - OK");
 }
 
-void updateVars(const AsyncWebServerRequest *request){
-  Serial.println("RUN - updateVars");
-
-  if (request->hasParam("cron_open")){
-    writeStringToEEPROM(ADDR_CRON_OPEN, request->getParam("cron_open")->value());
-    EEPROM.commit();
-    updateCron(cron_open, ADDR_CRON_OPEN, []() {
-      open_door_request = true;
-    });
-  }
-
-  if (request->hasParam("cron_close")){
-    writeStringToEEPROM(ADDR_CRON_CLOSE, request->getParam("cron_close")->value());
-    EEPROM.commit();
-    updateCron(cron_close, ADDR_CRON_CLOSE, []() {
-      close_door_request = true;
-    });
-  }
-  
-  Serial.println("RUN - updateVars - OK");
-}
-
-
-Thread motorThread = Thread();
 Thread cronThread = Thread();
 
 
 void setup(void) {
 
   Serial.begin(115200);
-  Serial.println("INIT - Start");
+  Serial.println(QUERY_STATUS_INIT_START);
 
   // Init EEPREOM
   EEPROM.begin(EEPROM_SIZE);
 
   // Init EEPROM vars :
   if( EEPROM.read(ADDR_INIT) != INIT_VALUE){
-    Serial.println("INIT - Reset EEPROM value");
     EEPROM.write(ADDR_INIT, INIT_VALUE);
     writeStringToEEPROM(ADDR_CRON_OPEN, DEFAULT_CRON_OPEN);
     writeStringToEEPROM(ADDR_CRON_CLOSE, DEFAULT_CRON_CLOSE);
@@ -148,20 +125,7 @@ void setup(void) {
   }
   
 
-
-  // Init stepper motor
-  Serial.println("INIT - Init Motor");
-  pinMode(SWITCH_OPEN_PIN, INPUT);
-  pinMode(SWITCH_CLOSE_PIN, INPUT);
-  pinMode(MOTOR_1_PIN, OUTPUT);
-  pinMode(MOTOR_2_PIN, OUTPUT);
-  
-  digitalWrite(MOTOR_1_PIN, LOW);
-  digitalWrite(MOTOR_2_PIN, LOW);
-  Serial.println("INIT - Init Motor - OK");
-
   // Init Wifi
-  Serial.println("INIT - Init Wifi");
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
 
@@ -169,30 +133,52 @@ void setup(void) {
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
   }
-  Serial.print("INIT - Wifi Connected : ");
+  Serial.println(QUERY_STATUS_INIT_CONNECTED);
   Serial.println(WiFi.localIP());
   
   // Init mDNS
-  if (MDNS.begin("districroq")) {
-    Serial.println("INIT - mDNS OK");
-  }
+  MDNS.begin("districroq");
 
   // Init FS
-  Serial.println("INIT - LittleFS");
   LittleFS.begin();
   
 
-  Serial.println("INIT - Route init");
   // Route for root / web page
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
-    updateVars(request);
-    if (request->hasParam("open")) {
-      open_door_request = true;
-    }
-    if (request->hasParam("close")) {
-      close_door_request = true;
-    }
+    if (DEBUG) Serial.println("RUN - call /");
     request->send(LittleFS, "/index.html", String(), false, processor);
+  });
+  server.on("/api/open", HTTP_GET, [](AsyncWebServerRequest *request){
+    if (DEBUG) Serial.println("RUN - call /api/open");
+    Serial.println(ACTION_OPEN);
+    request->redirect("/");
+  });
+  server.on("/api/close", HTTP_GET, [](AsyncWebServerRequest *request){
+    if (DEBUG) Serial.println("RUN - call /api/close");
+    Serial.println(ACTION_OPEN);
+    request->redirect("/");
+  });
+  server.on("/api/cron/open", HTTP_GET, [](AsyncWebServerRequest *request){
+    if (DEBUG) Serial.println("RUN - call /api/cron/open");
+    if (request->hasParam("cron_open")) {
+      writeStringToEEPROM(ADDR_CRON_OPEN, request->getParam("cron_open")->value());
+      EEPROM.commit();
+      updateCron(cron_open, ADDR_CRON_OPEN, []() {
+        open_door_request = true;
+      });
+    }
+    request->redirect("/");
+  });
+  server.on("/api/cron/close", HTTP_GET, [](AsyncWebServerRequest *request){
+    if (DEBUG) Serial.println("RUN - call /api/cron/close");
+    if (request->hasParam("cron_close")) {
+      writeStringToEEPROM(ADDR_CRON_CLOSE, request->getParam("cron_close")->value());
+      EEPROM.commit();
+      updateCron(cron_close, ADDR_CRON_CLOSE, []() {
+        close_door_request = true;
+      });
+    }
+    request->redirect("/");
   });
   
   // Route to load style.css file
@@ -208,53 +194,23 @@ void setup(void) {
   server.onNotFound( [](AsyncWebServerRequest *request){
     request->send(404, "text/plain", "Not found");
   });
-  Serial.println("INIT - Route init - OK");
 
   // Start server
   server.begin();
-  Serial.println("INIT - HTTP Server started");
 
   // Start NTP
-  Serial.println("INIT - NTP start");
   sntp_setoperatingmode(SNTP_OPMODE_POLL);
   ip4_addr ipaddr;
   IP4_ADDR(&ipaddr, 176,31,251,158);
 	sntp_setserver(0, &ipaddr);
 	sntp_init();
-  Serial.println("INIT - NTP start - OK");
 
-  cronThread.setInterval(100);
-  motorThread.onRun( []() {
-    
-    if(open_door_request){
-      if(door_is_open()){
-        open_door_request = false;
-      } else {
-        digitalWrite(MOTOR_1_PIN, LOW);
-        digitalWrite(MOTOR_2_PIN, HIGH);
-      }
-    } else
-    if(close_door_request){
-      if(door_is_close()){
-        close_door_request = false;
-      } else {
-        digitalWrite(MOTOR_1_PIN, HIGH);
-        digitalWrite(MOTOR_2_PIN, LOW);
-      }
-    } else {
-      digitalWrite(MOTOR_1_PIN, LOW);
-      digitalWrite(MOTOR_2_PIN, LOW);
-    }
-      
-  });
-
-  cronThread.setInterval(100);
+  cronThread.setInterval(1000);
   cronThread.onRun( []() {
     Cron.delay();
   });
   
   
-  controller.add(&motorThread); 
   controller.add(&cronThread); 
 
   updateCron(cron_open, ADDR_CRON_OPEN, []() {
@@ -263,6 +219,8 @@ void setup(void) {
   updateCron(cron_close, ADDR_CRON_CLOSE, []() {
     close_door_request = true;
   });
+
+  Serial.println(QUERY_STATUS_INIT_DONE);
   
 }
 

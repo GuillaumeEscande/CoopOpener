@@ -27,17 +27,15 @@
 			<article>
 				<h2>Manual Door Managment</h2>
 				<section>
-					<form>
+					<form  action="/api/open">
 						<h2>Manual Open</h2>
-						<input id="open" name="open" type="hidden" value="Open">
-						<button>Open</button>
+						<input type="submit" value="Open">
 					</form>
 				</section>
 				<section>
-					<form>
+					<form  action="/api/close">
 						<h2>Manual Close</h2>
-						<input id="close" name="close" type="hidden" value="Close">
-						<button>Close</button>
+						<input type="submit" value="Close">
 					</form>
 				</section>
 			</article>
@@ -46,16 +44,16 @@
 				<h1>Distribution Parameters</h1>
 				<section>
 					<h2>Cron open</h2>
-					<form>
+					<form action="/api/cron/open">
 						<input type="text" id="cron_open" name="cron_open" required value="%CRON_OPEN%"/>
-						<button>Update</button>
+						<input type="submit" value="Update">
 					</form>
 				</section>
 				<section>
 					<h2>Cron close</h2>
-					<form>
+					<form action="/api/cron/close">
 						<input type="text" id="cron_close" name="cron_close" required value="%CRON_CLOSE%"/>
-						<button>Update</button>
+						<input type="submit" value="Update">
 					</form>
 				</section>
 			</article>
