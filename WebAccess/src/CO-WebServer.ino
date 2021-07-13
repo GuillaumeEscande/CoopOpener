@@ -15,7 +15,7 @@
 #include <sntp.h>
 #include "protocol.hpp"
 
-#define DEBUG 0
+#define DEBUG false
 
 #define STASSID "GuiEtJew"
 #define STAPSK  "lithium est notre chat."
@@ -32,9 +32,6 @@
 
 const char *ssid = STASSID;
 const char *password = STAPSK;
-
-bool open_door_request = false;
-bool close_door_request = false;
 
 WiFiUDP ntpUDP;
 AsyncWebServer server(80);
@@ -70,19 +67,37 @@ String processor(const String& var){
   } else if(var == "DOOR_STATE"){
 
     Serial.println(QUERY_STATE);
-    String result = "";
-    while(result=""){
+    Serial.flush();
+    delay(100);
+    char buffer[256];
+    uint16_t cpt_buffer = 0;
+    uint16 cpt = 100;
+    while((cpt_buffer == 0 || buffer[cpt_buffer - 1] != '\n') && cpt > 0){
       if (Serial.available()){
-        result = Serial.readString();
-        delay(10);
+        buffer[cpt_buffer] = Serial.read();
+        ++ cpt_buffer;
+        buffer[cpt_buffer] = 0;
+      } else {
+        -- cpt;
+        delay(100);
       }
     }
-    //String result=RESPONSE_IS_OPEN;
-    if(result.equals(RESPONSE_IS_OPEN)){
-      return "OPEN";
-    }
-    if(result.equals(RESPONSE_IS_CLOSE)){
-      return "CLOSE";
+    
+      if (DEBUG) {
+        Serial.print("cpt = ");
+        Serial.println(cpt);
+        Serial.print("cpt_buffer = ");
+        Serial.println(cpt_buffer);
+        Serial.print(" buffer = ");
+        Serial.println(buffer);
+      }
+    if (cpt_buffer > 1) {
+      if(strncmp(buffer, RESPONSE_IS_OPEN, cpt_buffer-2) == 0){
+        return "OPEN";
+      }
+      if(strncmp(buffer, RESPONSE_IS_CLOSE, cpt_buffer-2) == 0){
+        return "CLOSE";
+      }
     }
     return "UNKNOWN";    
   } else if(var == "CRON_OPEN"){
@@ -110,7 +125,7 @@ Thread cronThread = Thread();
 
 void setup(void) {
 
-  Serial.begin(115200);
+  Serial.begin(57600);
   Serial.println(QUERY_STATUS_INIT_START);
 
   // Init EEPREOM
@@ -155,7 +170,7 @@ void setup(void) {
   });
   server.on("/api/close", HTTP_GET, [](AsyncWebServerRequest *request){
     if (DEBUG) Serial.println("RUN - call /api/close");
-    Serial.println(ACTION_OPEN);
+    Serial.println(ACTION_CLOSE);
     request->redirect("/");
   });
   server.on("/api/cron/open", HTTP_GET, [](AsyncWebServerRequest *request){
@@ -164,7 +179,7 @@ void setup(void) {
       writeStringToEEPROM(ADDR_CRON_OPEN, request->getParam("cron_open")->value());
       EEPROM.commit();
       updateCron(cron_open, ADDR_CRON_OPEN, []() {
-        open_door_request = true;
+        Serial.println(ACTION_OPEN);
       });
     }
     request->redirect("/");
@@ -175,7 +190,7 @@ void setup(void) {
       writeStringToEEPROM(ADDR_CRON_CLOSE, request->getParam("cron_close")->value());
       EEPROM.commit();
       updateCron(cron_close, ADDR_CRON_CLOSE, []() {
-        close_door_request = true;
+        Serial.println(ACTION_CLOSE);
       });
     }
     request->redirect("/");
@@ -214,10 +229,10 @@ void setup(void) {
   controller.add(&cronThread); 
 
   updateCron(cron_open, ADDR_CRON_OPEN, []() {
-    open_door_request = true;
+    Serial.println(ACTION_OPEN);
   });
   updateCron(cron_close, ADDR_CRON_CLOSE, []() {
-    close_door_request = true;
+    Serial.println(ACTION_CLOSE);
   });
 
   Serial.println(QUERY_STATUS_INIT_DONE);

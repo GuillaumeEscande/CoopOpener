@@ -5,17 +5,17 @@ class SerialListener {
 
 private:
     struct handler {
-        String trigger;
+        char* trigger;
         void (*function)();
     };
     uint16_t handlers_size = 0;
     handler handlers[128];
-    String buffer;
+    char buffer[256];
 
 public:
     SerialListener();
     void init();
-    void on_receive(String, void (*function)());
+    void on_receive(char[], void (*function)());
     void run();
 
 };

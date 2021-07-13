@@ -6,7 +6,7 @@
 #include "button.h"
 #include "serial_listener.h"
 
-#define DEBUG true
+#define DEBUG false
 
 #define INTERNAL_SWITCH_OPEN_PIN 12
 #define INTERNAL_SWITCH_CLOSE_PIN 11
@@ -64,7 +64,7 @@ void close_door(){
 
 void setup(void) {
 
-  Serial.begin(115200);
+  Serial.begin(57600);
   if (DEBUG) Serial.println("INIT - Start");
 
 
@@ -113,8 +113,6 @@ void setup(void) {
   controller.add(&motorThread); 
   controller.add(&serialThread); 
   controller.add(&buttonThread); 
-
-  internal.open();
 
   if (DEBUG) Serial.println("INIT - Stop");
   
