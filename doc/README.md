@@ -1,0 +1,1 @@
+# CoopOpener detailled documentation
